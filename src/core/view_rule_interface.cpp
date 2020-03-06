@@ -64,6 +64,12 @@ bool view_rule_interface_t::execute(const std::string &name, const std::vector<v
     else if (name == "maximize")
     {
         _maximize();
+        return false;
+    }
+    else if (name == "unmaximize")
+    {
+        _unmaximize();
+        return false;
     }
 
     std::cerr << "View rule interface: Unsupported action execution requested. Name: " << name << std::endl;
@@ -77,8 +83,12 @@ void view_rule_interface_t::set_view(wayfire_view view)
 
 void view_rule_interface_t::_maximize()
 {
-    // TODO: Figure out how to maximize a view.
+    _view->tile_request(wf::TILED_EDGES_ALL);
+}
 
+void view_rule_interface_t::_unmaximize()
+{
+    _view->tile_request(0);
 }
 
 std::tuple<bool, float> view_rule_interface_t::_validate_alpha(const std::vector<variant_t> &args)
