@@ -17,20 +17,42 @@ view_rule_interface_t::~view_rule_interface_t()
 
 variant_t view_rule_interface_t::get(const std::string &identifier, bool &error)
 {
-    // Assume things will go well.
-    error = false;
+    variant_t out = std::string(""); // Default to empty string as output.
+    error = false; // Assume things will go well.
+
     if (identifier == "app_id")
     {
-        return _view->get_app_id();
+        out = _view->get_app_id();
     }
     else if (identifier == "title")
     {
-        return _view->get_title();
+        out = _view->get_title();
+    }
+    else if (identifier == "role")
+    {
+        switch (_view->role)
+        {
+        case VIEW_ROLE_TOPLEVEL:
+            out = std::string("TOPLEVEL");
+            break;
+        case VIEW_ROLE_UNMANAGED:
+            out = std::string("UNMANAGED");
+            break;
+        case VIEW_ROLE_DESKTOP_ENVIRONMENT:
+            out = std::string("DESKTOP_ENVIRONMENT");
+            break;
+        default:
+            std::cerr << "View rule interface: View has unsupported value for role: " << static_cast<int>(_view->role) << std::endl;
+            error = true;
+            break;
+        }
+    }
+    else
+    {
+        std::cerr << "View rule interface: Get operation triggered to unsupported view property " << identifier << std::endl;
     }
 
-    std::cerr << "View rule interface: Get operation triggered to unsupported view property " << identifier << std::endl;
-    error = true;
-    return "";
+    return out;
 }
 
 bool view_rule_interface_t::execute(const std::string &name, const std::vector<variant_t> &args)
@@ -107,7 +129,7 @@ std::tuple<bool, float> view_rule_interface_t::_validate_alpha(const std::vector
     }
     else if (wf::is_double(args.at(1)))
     {
-        alpha = wf::get_double(args.at(1));
+        alpha = static_cast<float>(wf::get_double(args.at(1)));
     }
     else
     {
