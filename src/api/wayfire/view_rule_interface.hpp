@@ -22,6 +22,7 @@ public:
     void set_view(wayfire_view view);
 private:
     void _maximize();
+    void _unmaximize();
 
     std::tuple<bool, float> _validate_alpha(const std::vector<variant_t> &args);
     void _set_alpha(float alpha);
