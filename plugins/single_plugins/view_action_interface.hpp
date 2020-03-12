@@ -1,7 +1,7 @@
-#ifndef VIEW_RULE_INTERFACE_HPP
-#define VIEW_RULE_INTERFACE_HPP
+#ifndef VIEW_ACTION_INTERFACE_HPP
+#define VIEW_ACTION_INTERFACE_HPP
 
-#include "wayfire/rule/rule_interface.hpp"
+#include "wayfire/action/action_interface.hpp"
 #include "wayfire/view.hpp"
 #include <string>
 #include <tuple>
@@ -10,12 +10,10 @@
 namespace wf
 {
 
-class view_rule_interface_t : public rule_interface_t
+class view_action_interface_t : public action_interface_t
 {
 public:
-    virtual ~view_rule_interface_t() override;
-
-    virtual variant_t get(const std::string &identifier, bool &error) override;
+    virtual ~view_action_interface_t() override;
 
     virtual bool execute(const std::string &name, const std::vector<variant_t> &args) override;
 
@@ -32,4 +30,4 @@ private:
 
 } // End namespace wf.
 
-#endif // VIEW_RULE_INTERFACE_HPP
+#endif // VIEW_ACTION_INTERFACE_HPP
