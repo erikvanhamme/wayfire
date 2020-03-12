@@ -7,7 +7,7 @@
 
 #include <wayfire/plugin.hpp>
 #include <wayfire/view.hpp>
-#include <wayfire/view_rule_interface.hpp>
+#include <wayfire/view_access_interface.hpp>
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/view-transform.hpp>
 #include <wayfire/parser/rule_parser.hpp>
@@ -15,6 +15,8 @@
 #include <wayfire/variant.hpp>
 #include <wayfire/rule/rule_interface.hpp>
 #include <wayfire/rule/rule.hpp>
+
+#include "view_action_interface.hpp"
 
 class wayfire_window_rules : public wf::plugin_interface_t
 {
@@ -39,8 +41,9 @@ public:
             for (const auto &rule : _rules)
             {
                 auto view = get_signaled_view(data);
-                _rule_interface.set_view(view);
-                auto error = rule->apply("created", _rule_interface);
+                _access_interface.set_view(view);
+                _action_interface.set_view(view);
+                auto error = rule->apply("created", _access_interface, _action_interface);
                 if (error)
                 {
                     std::cerr << "Window-rules: Error while executing rule on created signal." << std::endl;
@@ -89,7 +92,8 @@ private:
     wf::signal_callback_t _created; //, maximized, fullscreened;
 
     std::vector<std::shared_ptr<wf::rule_t>> _rules;
-    wf::view_rule_interface_t _rule_interface;
+    wf::view_access_interface_t _access_interface;
+    wf::view_action_interface_t _action_interface;
 };
 
 DECLARE_WAYFIRE_PLUGIN(wayfire_window_rules);
