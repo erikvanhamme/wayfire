@@ -16,84 +16,97 @@
 #include <wayfire/rule/rule_interface.hpp>
 #include <wayfire/rule/rule.hpp>
 
-#include "view_action_interface.hpp"
+#include "../common/view_action_interface.hpp"
 
-class wayfire_window_rules : public wf::plugin_interface_t
+class wayfire_window_rules_t : public wf::plugin_interface_t
 {
 public:
-    void init()
-    {
-        // Build rule list.
-        auto section = wf::get_core().config.get_section("window-rules");
-        for (auto opt : section->get_registered_options())
-        {
-            _lexer.reset(opt->get_value_str());
-            auto rule = wf::rule_parser_t().parse(_lexer);
-            if (rule != nullptr)
-            {
-                _rules.push_back(rule);
-            }
-        }
-
-        // Created rule handler.
-        _created = [=] (wf::signal_data_t *data)
-        {
-            for (const auto &rule : _rules)
-            {
-                auto view = get_signaled_view(data);
-                _access_interface.set_view(view);
-                _action_interface.set_view(view);
-                auto error = rule->apply("created", _access_interface, _action_interface);
-                if (error)
-                {
-                    std::cerr << "Window-rules: Error while executing rule on created signal." << std::endl;
-                }
-            }
-        };
-        output->connect_signal("map-view", &_created);
-
-//        maximized = [=] (wf::signal_data_t *data)
-//        {
-//            auto conv = static_cast<view_tiled_signal*> (data);
-//            assert(conv);
-
-//            if (conv->edges != wf::TILED_EDGES_ALL)
-//                return;
-
-//            for (const auto& rule : rules_list["maximized"])
-//                rule(conv->view);
-//        };
-//        output->connect_signal("view-maximized", &maximized);
-
-//        fullscreened = [=] (wf::signal_data_t *data)
-//        {
-//            auto conv = static_cast<view_fullscreen_signal*> (data);
-//            assert(conv);
-
-//            if (!conv->state || conv->carried_out)
-//                return;
-
-//            for (const auto& rule : rules_list["fullscreened"])
-//                rule(conv->view);
-//            conv->carried_out = true;
-//        };
-//        output->connect_signal("view-fullscreen", &fullscreened);
-    }
-
-    void fini()
-    {
-        output->disconnect_signal("map-view", &_created);
-//        output->disconnect_signal("view-maximized", &maximized);
-//        output->disconnect_signal("view-fullscreen", &fullscreened);
-    }
+    void init() override;
+    void fini() override;
+    void apply(const std::string &signal, wf::signal_data_t *data);
 private:
     wf::lexer_t _lexer;
 
-    wf::signal_callback_t _created; //, maximized, fullscreened;
+    wf::signal_callback_t _created;
+    wf::signal_callback_t _maximized;
+    wf::signal_callback_t _minimized;
+    wf::signal_callback_t _fullscreened;
 
     std::vector<std::shared_ptr<wf::rule_t>> _rules;
+
     wf::view_access_interface_t _access_interface;
     wf::view_action_interface_t _action_interface;
 };
 
-DECLARE_WAYFIRE_PLUGIN(wayfire_window_rules);
+void wayfire_window_rules_t::init()
+{
+    // Build rule list.
+    auto section = wf::get_core().config.get_section("window-rules");
+    for (auto opt : section->get_registered_options())
+    {
+        _lexer.reset(opt->get_value_str());
+        auto rule = wf::rule_parser_t().parse(_lexer);
+        if (rule != nullptr)
+        {
+            _rules.push_back(rule);
+        }
+    }
+
+    // Created rule handler.
+    _created = [=] (wf::signal_data_t *data)
+    {
+        apply("created", data);
+    };
+    output->connect_signal("map-view", &_created);
+
+    // Maximized rule handler.
+    _maximized = [=] (wf::signal_data_t *data)
+    {
+        apply("maximized", data);
+    };
+    output->connect_signal("view-maximized", &_maximized);
+
+    // Minimized rule handler.
+    _minimized = [=] (wf::signal_data_t *data)
+    {
+        apply("minimized", data);
+    };
+    output->connect_signal("view-minimized", &_minimized);
+
+    // Fullscreened rule handler.
+    _fullscreened = [=] (wf::signal_data_t *data)
+    {
+        apply("fullscreened", data);
+    };
+    output->connect_signal("view-fullscreen", &_fullscreened);
+}
+
+void wayfire_window_rules_t::fini()
+{
+    output->disconnect_signal("map-view", &_created);
+    output->disconnect_signal("view-maximized", &_maximized);
+    output->disconnect_signal("view-minimized", &_minimized);
+    output->disconnect_signal("view-fullscreen", &_fullscreened);
+}
+
+void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t *data)
+{
+    if (data == nullptr)
+    {
+        return;
+    }
+
+    for (const auto &rule : _rules)
+    {
+        auto view = get_signaled_view(data);
+        _access_interface.set_view(view);
+        _action_interface.set_view(view);
+        auto error = rule->apply(signal, _access_interface, _action_interface);
+        if (error)
+        {
+            std::cerr << "Window-rules: Error while executing rule on " << signal << " signal." << std::endl;
+        }
+    }
+}
+
+DECLARE_WAYFIRE_PLUGIN(wayfire_window_rules_t);
