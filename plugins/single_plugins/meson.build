@@ -12,7 +12,7 @@ fast_switcher = shared_module('fast-switcher', 'fast-switcher.cpp', include_dire
 oswitch       = shared_module('oswitch',       'oswitch.cpp',       include_directories: [wayfire_api_inc, wayfire_conf_inc], dependencies: [wlroots, pixman, wfconfig], install: true, install_dir: join_paths(get_option('libdir'), 'wayfire'))
 
 window_rules  = shared_module('window-rules',
-                              ['window-rules.cpp', 'view_action_interface.cpp'],
+                              ['window-rules.cpp', '../common/view_action_interface.cpp'],
                               include_directories: [wayfire_api_inc, wayfire_conf_inc],
                               dependencies: [wlroots, pixman, wfconfig, wfutils],
                               install: true,

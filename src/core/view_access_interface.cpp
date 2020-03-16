@@ -44,6 +44,18 @@ variant_t view_access_interface_t::get(const std::string &identifier, bool &erro
             break;
         }
     }
+    else if (identifier == "fullscreen")
+    {
+        out = _view->fullscreen;
+    }
+    else if (identifier == "activated")
+    {
+        out = _view->activated;
+    }
+    else if (identifier == "minimized")
+    {
+        out = _view->minimized;
+    }
     else
     {
         std::cerr << "View access interface: Get operation triggered to unsupported view property " << identifier << std::endl;
