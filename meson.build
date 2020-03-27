@@ -31,6 +31,7 @@ threads        = dependency('threads')
 xkbcommon      = dependency('xkbcommon')
 wlroots        = dependency('wlroots', version: ['>=0.9.0', '<0.11.0'], required: get_option('use_system_wlroots'))
 wfconfig       = dependency('wf-config', version: ['>=0.4.0', '<0.5.0'], required: get_option('use_system_wfconfig'))
+wfutils        = dependency('wf-utils', version: ['>=0.4.0', '<0.5.0'])
 
 use_system_wlroots = not get_option('use_system_wlroots').disabled() and wlroots.found()
 if not use_system_wlroots
@@ -83,7 +84,7 @@ configure_file(input: 'config.h.in',
                output: 'config.h',
                configuration: conf_data)
 
-wayfire_conf_inc = include_directories(['.'])
+wayfire_conf_inc = include_directories(['.', '/usr/include/wayfire'])
 
 add_project_arguments(['-Wno-unused-parameter'], language: 'cpp')
 

@@ -1,306 +1,197 @@
-#include <wayfire/plugin.hpp>
-#include <wayfire/output.hpp>
-#include <wayfire/view.hpp>
-#include <cwctype>
-#include <cstdio>
-#include <wayfire/signal-definitions.hpp>
-#include <assert.h>
-#include <map>
+#include <algorithm>
 #include <cfloat>
-#include "wayfire/view-transform.hpp"
+#include <memory>
+#include <vector>
 
-using std::string;
+#include <iostream>
 
-/*
-rules syntax:
+#include <wayfire/plugin.hpp>
+#include <wayfire/view.hpp>
+#include <wayfire/signal-definitions.hpp>
+#include <wayfire/view-transform.hpp>
+#include <wayfire/parser/rule_parser.hpp>
+#include <wayfire/lexer/lexer.hpp>
+#include <wayfire/variant.hpp>
+#include <wayfire/rule/rule_interface.hpp>
+#include <wayfire/rule/rule.hpp>
 
-title (T) / title contains (T) / app-id (T) / app-id contains (T) (created/destroyed/maximized/fullscreened) ->
-    move X Y | resize W H | (un)set fullscreen | (un)set maximized | set alpha A
-
-where (T) is a text surrounded by parenthesis, for ex. (tilix)
-contains (T) means that (T) can be found anywhere in the title/app-id string
-
-X Y W H are simply integers indicating the position where the view
-should be placed and W H are positive integers indicating size
-
-examples:
-
-title contains Chrome created -> set maximized
-app-id tilix created -> move 0 0
-
- */
-
-static string trim(string x)
+class view_rule_interface_t : public wf::rule_interface_t
 {
-    int i = 0, j = x.length() - 1;
-    while(i < (int)x.length() && std::iswspace(x[i])) ++i;
-    while(j >= 0 && std::iswspace(x[j])) --j;
+public:
+    virtual ~view_rule_interface_t() override;
+    virtual wf::variant_t get(const std::string &identifier, bool &error) override;
+    virtual bool execute(const std::string &name, const std::vector<wf::variant_t> &args) override;
+    void set_view(wayfire_view view);
+private:
+    wayfire_view _view;
+};
 
-    if (i <= j)
-        return x.substr(i, j - i + 1);
-    else
-        return "";
+view_rule_interface_t::~view_rule_interface_t()
+{
 }
 
-static bool starts_with(string x, string y)
+wf::variant_t view_rule_interface_t::get(const std::string &identifier, bool &error)
 {
-    return x.length() >= y.length() && x.substr(0, y.length()) == y;
+    // Assume things will go well.
+    error = false;
+    if (identifier == "app_id")
+    {
+        return _view->get_app_id();
+    }
+    else if (identifier == "title")
+    {
+        return _view->get_title();
+    }
+
+    std::cerr << "View rule interface: Get operation triggered to unsupported view property " << identifier << std::endl;
+    error = true;
+    return "";
 }
 
-static bool ends_with(string x, string y)
+bool view_rule_interface_t::execute(const std::string &name, const std::vector<wf::variant_t> &args)
 {
-    return x.length() >= y.length() && x.substr(x.length() - y.length()) == y;
+    if (name == "set")
+    {
+        if ((args.size() < 2) || (wf::is_string(args.at(0)) == false))
+        {
+            std::cerr << "View rule interface: Set execution requires at least 2 arguments, the first of which should be an identifier." << std::endl;
+            return true;
+        }
+
+        auto id = wf::get_string(args.at(0));
+
+        if (id == "alpha")
+        {
+            if (args.size() != 2)
+            {
+                std::cerr << "View rule interface: invalid arguments. Expected 'set alpha [float|double]" << std::endl;
+                return true;
+            }
+
+            float alpha = 1.0f;
+            if (wf::is_float(args.at(1)))
+            {
+                alpha = wf::get_float(args.at(1));
+            }
+            else if (wf::is_double(args.at(1)))
+            {
+                alpha = wf::get_double(args.at(1));
+            }
+            else
+            {
+                std::cerr << "View rule interface: invalid arguments. Expected 'set alpha [float|double]" << std::endl;
+                return true;
+            }
+            alpha = std::clamp(alpha, 0.1f, 1.0f);
+
+            // Apply view transformer if needed and set alpha.
+            wf::view_2D *transformer;
+
+            if (!_view->get_transformer("alpha"))
+            {
+                _view->add_transformer(std::make_unique<wf::view_2D> (_view), "alpha");
+            }
+
+            transformer = dynamic_cast<wf::view_2D *> (_view->get_transformer("alpha").get());
+            if (fabs(transformer->alpha - alpha) > FLT_EPSILON)
+            {
+                transformer->alpha = alpha;
+                _view->damage();
+
+                std::cout << "View rule interface: alpha set to " << alpha << std::endl;
+            }
+        }
+        else
+        {
+            std::cerr << "View rule interface: Unsupported set operation to identifier " << id << std::endl;
+            return true;
+        }
+
+        return false;
+    }
+
+    std::cerr << "View rule interface: Unsupported action execution requested. Name: " << name << std::endl;
+    return true;
 }
 
+void view_rule_interface_t::set_view(wayfire_view view)
+{
+    _view = view;
+}
 
 class wayfire_window_rules : public wf::plugin_interface_t
 {
-    using verification_func = std::function<bool(wayfire_view, std::string)>;
+private:
+    wf::lexer_t _lexer;
 
-    struct verificator
-    {
-        verification_func func;
-        std::string atom;
-    };
+    wf::signal_callback_t _created; //, maximized, fullscreened;
 
-    std::vector<verificator> verficators =
-    {
-        {  [] (wayfire_view view, std::string match) -> bool
-            {
-                auto title = view->get_title();
-                return title.find(match) != std::string::npos;
-            },
-            "title contains"
-        },
-        { [] (wayfire_view view, std::string match) -> bool
-            {
-                auto title = view->get_title();
-                return title == match;
-            },
-            "title"
-        },
-        {  [] (wayfire_view view, std::string match) -> bool
-            {
-                auto app_id = view->get_app_id();
-                return app_id.find(match) != std::string::npos;
-            },
-            "app-id contains"
-        },
-        {  [] (wayfire_view view, std::string match) -> bool
-            {
-                auto app_id = view->get_app_id();
-                return app_id == match;
-            },
-            "app-id"
-        },
-    };
-
-    std::vector<std::string> events = {
-        "created", "maximized", "fullscreened"
-    };
-
-    using action_func = std::function<void(wayfire_view view)>;
-
-    struct lambda_executor
-    {
-        verification_func verify;
-        std::string verification_string;
-        action_func action;
-    };
-
-    using rule_func = std::function<void(wayfire_view)>;
-    struct rule
-    {
-        std::string signal;
-        std::function<void(wayfire_view)> func;
-    };
-
-    rule parse_add_rule(std::string rule)
-    {
-        std::string predicate, action;
-        struct rule result;
-
-        size_t pos = 0;
-        for (; pos < rule.size() - 2; ++pos)
-        {
-            if (rule[pos] == '-' && rule[pos + 1] == '>')
-                break;
-        }
-
-        /* first condition is so that there is no underflow in unsigned arithmetic */
-        if (rule.size() <= 5 || pos >= rule.size() - 2 || pos < 1)
-            return result;
-
-        predicate = trim(rule.substr(0, pos));
-        std::string event;
-        action = trim(rule.substr(pos + 2, rule.size() - pos - 1));
-
-        for (auto ev : events)
-        {
-            if (ends_with(predicate, ev))
-            {
-                event = ev;
-                predicate = trim(predicate.substr(0, predicate.length() - ev.length()));
-                break;
-            }
-        }
-
-        lambda_executor exec;
-        exec.verify = nullptr;
-        exec.action = nullptr;
-
-        for (const auto& pred : verficators)
-        {
-            if (starts_with(predicate, pred.atom))
-            {
-                exec.verify = pred.func;
-                exec.verification_string =
-                    trim(predicate.substr(pred.atom.length(),
-                                          predicate.length() - pred.atom.length()));
-                break;
-            }
-        }
-
-        if (!exec.verify || !event.length())
-            return result;
-
-        if (starts_with(action, "move"))
-        {
-            int x, y;
-            int t = std::sscanf(action.c_str(), "move %d %d", &x, &y);
-
-            if (t != 2)
-                return result;
-
-            exec.action = [x,y] (wayfire_view view) {
-                auto og = view->get_output()->get_relative_geometry();
-                view->move(og.x + x, og.y + y);
-            };
-        } else if (starts_with(action, "resize"))
-        {
-            int w, h;
-            int t = std::sscanf(action.c_str(), "resize %d %d", &w, &h);
-
-            if (t != 2 || w <= 0 || h <= 0)
-                return result;
-
-            exec.action = [w,h] (wayfire_view view) mutable {
-                auto screen_size = view->get_output()->get_screen_size();
-                if (w > 100000)
-                    w = screen_size.width;
-                if (h > 100000)
-                    h = screen_size.height;
-                view->resize(w, h);
-            };
-        } else if (ends_with(action, "set maximized"))
-        {
-            exec.action = [action] (wayfire_view view)
-            {
-                uint32_t edges =
-                    starts_with(action, "set") ? wf::TILED_EDGES_ALL : 0;
-                view->tile_request(edges);
-            };
-        } else if (ends_with(action, "set fullscreen"))
-        {
-            exec.action = [action] (wayfire_view view)
-            {
-                view_fullscreen_signal data;
-                data.view = view;
-                data.state = starts_with(action, "set");
-                view->get_output()->emit_signal("view-fullscreen-request", &data);
-            };
-        } else if (starts_with(action, "set alpha"))
-        {
-            float a;
-            int t = std::sscanf(action.c_str(), "set alpha %f", &a);
-            if (t != 1)
-                return result;
-            a = std::max(std::min(1.0f, a), 0.1f); /* clamp a in range [0.1f, 1.0f] */
-
-            exec.action = [a] (wayfire_view view)
-            {
-                wf::view_2D *transformer;
-
-                if (!view->get_transformer("alpha"))
-                    view->add_transformer(std::make_unique<wf::view_2D> (view), "alpha");
-
-                transformer = dynamic_cast<wf::view_2D *> (view->get_transformer("alpha").get());
-                if (fabs(transformer->alpha - a) > FLT_EPSILON)
-                {
-                    transformer->alpha = a;
-                    view->damage();
-                }
-            };
-        }
-
-
-        if (!exec.action)
-            return result;
-
-        result.signal = event;
-        result.func = [exec] (wayfire_view view)
-        {
-            if (exec.verify(view, exec.verification_string))
-                exec.action(view);
-        };
-
-        return result;
-    }
-
-    wf::signal_callback_t created, maximized, fullscreened;
-
-    std::map<std::string, std::vector<rule_func>> rules_list;
-
-    public:
+    std::vector<std::shared_ptr<wf::rule_t>> _rules;
+    view_rule_interface_t _rule_interface;
+public:
     void init()
     {
+        // Build rule list.
         auto section = wf::get_core().config.get_section("window-rules");
         for (auto opt : section->get_registered_options())
         {
-            auto rule = parse_add_rule(opt->get_value_str());
-            rules_list[rule.signal].push_back(rule.func);
+            _lexer.reset(opt->get_value_str());
+            auto rule = wf::rule_parser_t().parse(_lexer);
+            if (rule != nullptr)
+            {
+                _rules.push_back(rule);
+            }
         }
 
-        created = [=] (wf::signal_data_t *data)
+        // Created rule handler.
+        _created = [=] (wf::signal_data_t *data)
         {
-            for (const auto& rule : rules_list["created"])
-                rule(get_signaled_view(data));
+            for (const auto &rule : _rules)
+            {
+                auto view = get_signaled_view(data);
+                _rule_interface.set_view(view);
+                auto error = rule->apply("created", _rule_interface);
+                if (error)
+                {
+                    std::cerr << "Window-rules: Error while executing rule on created signal." << std::endl;
+                }
+            }
         };
-        output->connect_signal("map-view", &created);
+        output->connect_signal("map-view", &_created);
 
-        maximized = [=] (wf::signal_data_t *data)
-        {
-            auto conv = static_cast<view_tiled_signal*> (data);
-            assert(conv);
+//        maximized = [=] (wf::signal_data_t *data)
+//        {
+//            auto conv = static_cast<view_tiled_signal*> (data);
+//            assert(conv);
 
-            if (conv->edges != wf::TILED_EDGES_ALL)
-                return;
+//            if (conv->edges != wf::TILED_EDGES_ALL)
+//                return;
 
-            for (const auto& rule : rules_list["maximized"])
-                rule(conv->view);
-        };
-        output->connect_signal("view-maximized", &maximized);
+//            for (const auto& rule : rules_list["maximized"])
+//                rule(conv->view);
+//        };
+//        output->connect_signal("view-maximized", &maximized);
 
-        fullscreened = [=] (wf::signal_data_t *data)
-        {
-            auto conv = static_cast<view_fullscreen_signal*> (data);
-            assert(conv);
+//        fullscreened = [=] (wf::signal_data_t *data)
+//        {
+//            auto conv = static_cast<view_fullscreen_signal*> (data);
+//            assert(conv);
 
-            if (!conv->state || conv->carried_out)
-                return;
+//            if (!conv->state || conv->carried_out)
+//                return;
 
-            for (const auto& rule : rules_list["fullscreened"])
-                rule(conv->view);
-            conv->carried_out = true;
-        };
-        output->connect_signal("view-fullscreen", &fullscreened);
+//            for (const auto& rule : rules_list["fullscreened"])
+//                rule(conv->view);
+//            conv->carried_out = true;
+//        };
+//        output->connect_signal("view-fullscreen", &fullscreened);
     }
 
     void fini()
     {
-        output->disconnect_signal("map-view", &created);
-        output->disconnect_signal("view-maximized", &maximized);
-        output->disconnect_signal("view-fullscreen", &fullscreened);
+        output->disconnect_signal("map-view", &_created);
+//        output->disconnect_signal("view-maximized", &maximized);
+//        output->disconnect_signal("view-fullscreen", &fullscreened);
     }
 };
 
