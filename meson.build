@@ -31,7 +31,6 @@ threads        = dependency('threads')
 xkbcommon      = dependency('xkbcommon')
 wlroots        = dependency('wlroots', version: ['>=0.9.0', '<0.11.0'], required: get_option('use_system_wlroots'))
 wfconfig       = dependency('wf-config', version: ['>=0.4.0', '<0.5.0'], required: get_option('use_system_wfconfig'))
-wfutils        = dependency('wf-utils', version: ['>=0.4.0', '<0.5.0'])
 
 use_system_wlroots = not get_option('use_system_wlroots').disabled() and wlroots.found()
 if not use_system_wlroots
@@ -42,6 +41,8 @@ use_system_wfconfig = not get_option('use_system_wfconfig').disabled() and wfcon
 if not use_system_wfconfig
   wfconfig = subproject('wf-config').get_variable('wfconfig')
 endif
+
+wfutils = subproject('wf-utils').get_variable('wfutils')
 
 needs_libinotify = ['freebsd', 'dragonfly'].contains(host_machine.system())
 libinotify       = dependency('libinotify', required: needs_libinotify)
