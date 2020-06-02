@@ -13,8 +13,6 @@
 #include <wayfire/parser/rule_parser.hpp>
 #include <wayfire/lexer/lexer.hpp>
 #include <wayfire/variant.hpp>
-#include <wayfire/rule/lambda_rule.hpp>
-#include <wayfire/rule/rule_interface.hpp>
 #include <wayfire/rule/rule.hpp>
 
 #include "../common/lambda-rules-registration.hpp"

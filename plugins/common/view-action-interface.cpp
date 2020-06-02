@@ -1,4 +1,3 @@
-#include "wayfire/rule/rule_interface.hpp"
 #include "wayfire/output.hpp"
 #include "wayfire/view.hpp"
 #include "view-action-interface.hpp"
