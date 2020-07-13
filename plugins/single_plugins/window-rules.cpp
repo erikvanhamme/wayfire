@@ -13,9 +13,11 @@
 #include <wayfire/parser/rule_parser.hpp>
 #include <wayfire/lexer/lexer.hpp>
 #include <wayfire/variant.hpp>
+#include <wayfire/rule/lambda_rule.hpp>
 #include <wayfire/rule/rule_interface.hpp>
 #include <wayfire/rule/rule.hpp>
 
+#include "../common/lambda-rules-registration.hpp"
 #include "../common/view-action-interface.hpp"
 
 class wayfire_window_rules_t : public wf::plugin_interface_t
@@ -36,10 +38,32 @@ private:
 
     wf::view_access_interface_t _access_interface;
     wf::view_action_interface_t _action_interface;
+
+    nonstd::observer_ptr<wf::lambda_rules_registrations_t> _lambda_registrations;
 };
 
 void wayfire_window_rules_t::init()
 {
+    // Get the lambda rules registrations.
+    _lambda_registrations = wf::lambda_rules_registrations_t::getInstance();
+
+    // TODO: Remove debug/test code.
+    // Test rule
+    auto reg = std::make_shared<wf::lambda_rule_registration_t>();
+    reg->rule = "on created if title contains \"Alacritty\"";
+    reg->if_lambda = [] () {
+        std::cout << "test rule IF_LAMBDA!" << std::endl;
+        return false;
+    };
+    reg->else_lambda = [] () {
+        std::cout << "test rule ELSE_LAMBDA!" << std::endl;
+        return false;
+    };
+    auto error = _lambda_registrations->registerLambdaRule("test_rule", reg);
+    if (error) {
+        std::cerr << "Window-rules: Error while registering test rule." << std::endl;
+    }
+
     // Build rule list.
     auto section = wf::get_core().config.get_section("window-rules");
     for (auto opt : section->get_registered_options())
@@ -103,6 +127,35 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
         if (error) {
             std::cerr << "Window-rules: Error while executing rule on " << signal << " signal." << std::endl;
         }
+    }
+
+    auto bounds = _lambda_registrations->rules();
+    auto begin = std::get<0>(bounds);
+    auto end = std::get<1>(bounds);
+    while (begin != end)
+    {
+        auto registration = std::get<1>(*begin);
+        bool error = false;
+
+        if (registration->access_interface == nullptr)
+        {
+            auto view = get_signaled_view(data);
+            _access_interface.set_view(view);
+
+            // TODO: Remove debug/test code.
+            std::cout << "Apply rule to view: " << view->get_app_id() << ": ";
+
+            error = registration->rule_instance->apply(signal, _access_interface);
+        }
+        else {
+            error = registration->rule_instance->apply(signal, *registration->access_interface);
+        }
+
+        if (error) {
+            std::cerr << "Window-rules: Error while executing rule on " << signal << " signal." << std::endl;
+        }
+
+        ++begin;
     }
 }
 
