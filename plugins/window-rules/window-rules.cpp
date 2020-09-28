@@ -3,21 +3,19 @@
 #include <memory>
 #include <vector>
 
-#include <iostream>
-
 #include <wayfire/plugin.hpp>
 #include <wayfire/view.hpp>
 #include <wayfire/view-access-interface.hpp>
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/view-transform.hpp>
 #include <wayfire/parser/rule_parser.hpp>
-#include <wayfire/plugins/common/lambda-rules-registration.hpp>
 #include <wayfire/lexer/lexer.hpp>
 #include <wayfire/variant.hpp>
 #include <wayfire/rule/lambda_rule.hpp>
 #include <wayfire/rule/rule.hpp>
 #include <wayfire/util/log.hpp>
 
+#include "lambda-rules-registration.hpp"
 #include "view-action-interface.hpp"
 
 class wayfire_window_rules_t : public wf::plugin_interface_t
@@ -80,14 +78,14 @@ void wayfire_window_rules_t::init()
     {
         apply("created", data);
     };
-    output->connect_signal("map-view", &_created);
+    output->connect_signal("view-mapped", &_created);
 
     // Maximized rule handler.
     _maximized = [=] (wf::signal_data_t *data)
     {
         apply("maximized", data);
     };
-    output->connect_signal("view-maximized", &_maximized);
+    output->connect_signal("view-tiled", &_maximized);
 
     // Minimized rule handler.
     _minimized = [=] (wf::signal_data_t *data)
@@ -106,8 +104,8 @@ void wayfire_window_rules_t::init()
 
 void wayfire_window_rules_t::fini()
 {
-    output->disconnect_signal("map-view", &_created);
-    output->disconnect_signal("view-maximized", &_maximized);
+    output->disconnect_signal("view-mapped", &_created);
+    output->disconnect_signal("view-tiled", &_maximized);
     output->disconnect_signal("view-minimized", &_minimized);
     output->disconnect_signal("view-fullscreen", &_fullscreened);
 }
@@ -118,9 +116,18 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
         return;
     }
 
+    auto view = get_signaled_view(data);
+    if (view == nullptr) {
+        LOGE("View is null.");
+        return;
+    }
+
+    if ((signal == "maximized") && (view->tiled_edges != wf::TILED_EDGES_ALL)) {
+        return;
+    }
+
     for (const auto &rule : _rules)
     {
-        auto view = get_signaled_view(data);
         _access_interface.set_view(view);
         _action_interface.set_view(view);
         auto error = rule->apply(signal, _access_interface, _action_interface);
@@ -139,7 +146,6 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
 
         if (registration->access_interface == nullptr)
         {
-            auto view = get_signaled_view(data);
             _access_interface.set_view(view);
 
             // TODO: Remove debug/test code.
