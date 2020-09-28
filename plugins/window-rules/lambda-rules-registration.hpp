@@ -17,22 +17,26 @@ class wayfire_window_rules_t;
 
 namespace wf
 {
-
 struct lambda_rule_registration_t;
 
 using map_type = std::map<std::string, std::shared_ptr<lambda_rule_registration_t>>;
 
 /**
- * @brief The lambda_rule_registration_t struct represents registration information for a single lambda rule.
+ * @brief The lambda_rule_registration_t struct represents registration information
+ *for a single lambda rule.
  *
- * To make a registration, create one of these structures in a shared_ptr, fill in the appropriate values and
+ * To make a registration, create one of these structures in a shared_ptr, fill in
+ *the appropriate values and
  * register it on the lambda_rules_registrations_t singleton instance.
  *
  * At minimum, the rule string and if_lambda need to be set.
  *
- * The rule text defines the condition that will will be matched by window-rules. If the condition described
- * in the rule text evaluates to true (using access_interface to determine the current values of variables),
- * the if_lambda function will be executed. If the condition evaluates to false, the else_lambda (if not
+ * The rule text defines the condition that will will be matched by window-rules. If
+ *the condition described
+ * in the rule text evaluates to true (using access_interface to determine the
+ *current values of variables),
+ * the if_lambda function will be executed. If the condition evaluates to false, the
+ *else_lambda (if not
  * nullptr) will be executed.
  */
 struct lambda_rule_registration_t
@@ -46,19 +50,22 @@ struct lambda_rule_registration_t
     std::string rule;
 
     /**
-     * @brief if_lambda This is the lambda method to be executed if the specified condition holds.
+     * @brief if_lambda This is the lambda method to be executed if the specified
+     *condition holds.
      *
      * @note The registering plugin is supposed to set this value before registering.
      */
     wf::lambda_t if_lambda;
 
     /**
-     * @brief else_lambda This is the lambda method to be executed if the specified condition does not hold.
+     * @brief else_lambda This is the lambda method to be executed if the specified
+     *condition does not hold.
      *
      * @note The registering plugin is supposed to set this value before registering.
      * @note In most cases this should be left blank.
      *
-     * @attention: Be very careful with this lambda because it will be executed on the signal for each view
+     * @attention: Be very careful with this lambda because it will be executed on
+     *the signal for each view
      *             that did NOT match the condition.
      */
     wf::lambda_t else_lambda;
@@ -66,7 +73,8 @@ struct lambda_rule_registration_t
     /**
      * @brief access_interface Access interface to be used when evaluating the rule.
      *
-     * @note If this is left blank (nullptr), the standard view_access_interface_t instance will be used.
+     * @note If this is left blank (nullptr), the standard view_access_interface_t
+     *instance will be used.
      */
     std::shared_ptr<wf::access_interface_t> access_interface;
 
@@ -74,8 +82,10 @@ struct lambda_rule_registration_t
     /**
      * @brief rule_instance Pointer to the parsed rule object.
      *
-     * @attention You should not set this. Leave it at nullptr, the registration process will fill in this
-     *            variable. Window rules can then use this cached rule instance on each signal occurrence.
+     * @attention You should not set this. Leave it at nullptr, the registration
+     *process will fill in this
+     *            variable. Window rules can then use this cached rule instance on
+     *each signal occurrence.
      */
     std::shared_ptr<wf::lambda_rule_t> rule_instance;
 
@@ -87,12 +97,14 @@ struct lambda_rule_registration_t
 };
 
 /**
- * @brief The lambda_rules_registrations_t class is a helper class for easy registration and unregistration of
+ * @brief The lambda_rules_registrations_t class is a helper class for easy
+ *registration and unregistration of
  *        lambda rules for the window rules plugin.
  *
  * This class is a singleton and can only be used via the getInstance() method.
  *
- * The instance is stored in wf::core. The getInstance() method will fetch from wf:core, and lazy-init if the
+ * The instance is stored in wf::core. The getInstance() method will fetch from
+ *wf:core, and lazy-init if the
  * instance is not yet present.
  */
 class lambda_rules_registrations_t : public custom_data_t
@@ -108,14 +120,18 @@ class lambda_rules_registrations_t : public custom_data_t
         auto instance = get_core().get_data<lambda_rules_registrations_t>();
         if (instance == nullptr)
         {
-            get_core().store_data(std::unique_ptr<lambda_rules_registrations_t>(new lambda_rules_registrations_t()));
+            get_core().store_data(std::unique_ptr<lambda_rules_registrations_t>(new
+                lambda_rules_registrations_t()));
 
             instance = get_core().get_data<lambda_rules_registrations_t>();
 
-            if (instance == nullptr) {
+            if (instance == nullptr)
+            {
                 LOGE("Window lambda rules: Lazy-init of lambda registrations failed.");
-            } else {
-                LOGI("Window lambda rules: Lazy-init of lambda registrations succeeded.");
+            } else
+            {
+                LOGI(
+                    "Window lambda rules: Lazy-init of lambda registrations succeeded.");
             }
         }
 
@@ -125,25 +141,32 @@ class lambda_rules_registrations_t : public custom_data_t
     /**
      * @brief registerLambdaRule Registers a lambda rule with its associated key.
      *
-     * This method will return error result if the key is not unique or the registration struct is incomplete.
+     * This method will return error result if the key is not unique or the
+     *registration struct is incomplete.
      *
      * @param[in] key Unique key for the registration.
      * @param[in] registration The registration structure.
      *
      * @return <code>True</code> in case of error, <code>false</code> if ok.
      */
-    bool register_lambda_rule(std::string key, std::shared_ptr<lambda_rule_registration_t> registration)
+    bool register_lambda_rule(std::string key,
+        std::shared_ptr<lambda_rule_registration_t> registration)
     {
-        if (_registrations.find(key) != _registrations.end()) {
+        if (_registrations.find(key) != _registrations.end())
+        {
             return true; // Error, key already exists.
         }
 
-        if (registration->if_lambda == nullptr) {
+        if (registration->if_lambda == nullptr)
+        {
             return true; // Error, no if lambda specified.
         }
 
-        registration->rule_instance = lambda_rule_parser_t().parse(registration->rule, registration->if_lambda, registration->else_lambda);
-        if (registration->rule_instance == nullptr) {
+        registration->rule_instance = lambda_rule_parser_t().parse(
+            registration->rule, registration->if_lambda,
+            registration->else_lambda);
+        if (registration->rule_instance == nullptr)
+        {
             return true; // Error, failed to parse rule.
         }
 
@@ -165,7 +188,8 @@ class lambda_rules_registrations_t : public custom_data_t
     }
 
     /**
-     * @brief rules Gets the boundaries of the rules map as a tuple of cbegin() and cend() const_iterators.
+     * @brief rules Gets the boundaries of the rules map as a tuple of cbegin() and
+     *cend() const_iterators.
      *
      * @return Boundaries of the rules map.
      */
@@ -173,9 +197,11 @@ class lambda_rules_registrations_t : public custom_data_t
     {
         return std::tuple(_registrations.cbegin(), _registrations.cend());
     }
+
   private:
     /**
-     * @brief lambda_rules_registrations_t Constructor, private to enforce singleton design pattern.
+     * @brief lambda_rules_registrations_t Constructor, private to enforce singleton
+     *design pattern.
      */
     lambda_rules_registrations_t() = default;
 
@@ -184,7 +210,6 @@ class lambda_rules_registrations_t : public custom_data_t
      */
     map_type _registrations;
 };
-
 } // End namespace wf.
 
 #endif // LAMBDARULESREGISTRATION_HPP
