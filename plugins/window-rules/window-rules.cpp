@@ -11,13 +11,14 @@
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/view-transform.hpp>
 #include <wayfire/parser/rule_parser.hpp>
+#include <wayfire/plugins/common/lambda-rules-registration.hpp>
 #include <wayfire/lexer/lexer.hpp>
 #include <wayfire/variant.hpp>
 #include <wayfire/rule/lambda_rule.hpp>
 #include <wayfire/rule/rule.hpp>
+#include <wayfire/util/log.hpp>
 
-#include "../common/lambda-rules-registration.hpp"
-#include "../common/view-action-interface.hpp"
+#include "view-action-interface.hpp"
 
 class wayfire_window_rules_t : public wf::plugin_interface_t
 {
@@ -44,23 +45,23 @@ private:
 void wayfire_window_rules_t::init()
 {
     // Get the lambda rules registrations.
-    _lambda_registrations = wf::lambda_rules_registrations_t::getInstance();
+    _lambda_registrations = wf::lambda_rules_registrations_t::get_instance();
 
     // TODO: Remove debug/test code.
     // Test rule
     auto reg = std::make_shared<wf::lambda_rule_registration_t>();
     reg->rule = "on created if title contains \"Alacritty\"";
     reg->if_lambda = [] () {
-        std::cout << "test rule IF_LAMBDA!" << std::endl;
+        LOGI("test rule IF_LAMBDA!");
         return false;
     };
     reg->else_lambda = [] () {
-        std::cout << "test rule ELSE_LAMBDA!" << std::endl;
+        LOGI("test rule ELSE_LAMBDA!");
         return false;
     };
-    auto error = _lambda_registrations->registerLambdaRule("test_rule", reg);
+    auto error = _lambda_registrations->register_lambda_rule("test_rule", reg);
     if (error) {
-        std::cerr << "Window-rules: Error while registering test rule." << std::endl;
+        LOGE("Window-rules: Error while registering test rule.");
     }
 
     // Build rule list.
@@ -124,7 +125,7 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
         _action_interface.set_view(view);
         auto error = rule->apply(signal, _access_interface, _action_interface);
         if (error) {
-            std::cerr << "Window-rules: Error while executing rule on " << signal << " signal." << std::endl;
+            LOGE("Window-rules: Error while executing rule on ", signal, " signal.");
         }
     }
 
@@ -142,7 +143,7 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
             _access_interface.set_view(view);
 
             // TODO: Remove debug/test code.
-            std::cout << "Apply rule to view: " << view->get_app_id() << ": ";
+            LOGI("Apply rule to view: ", view->get_app_id(), ": ");
 
             error = registration->rule_instance->apply(signal, _access_interface);
         }
@@ -151,7 +152,7 @@ void wayfire_window_rules_t::apply(const std::string &signal, wf::signal_data_t 
         }
 
         if (error) {
-            std::cerr << "Window-rules: Error while executing rule on " << signal << " signal." << std::endl;
+            LOGE("Window-rules: Error while executing rule on ", signal, " signal.");
         }
 
         ++begin;

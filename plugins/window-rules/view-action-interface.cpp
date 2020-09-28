@@ -1,8 +1,11 @@
+#include "view-action-interface.hpp"
+
 #include "wayfire/output.hpp"
 #include "wayfire/view.hpp"
-#include "view-action-interface.hpp"
-#include "snap_signal.hpp"
+#include "../single_plugins/snap_signal.hpp" // TODO: Should snap_signal be in wayfire/plugins/common ?
+#include "wayfire/util/log.hpp"
 #include "wayfire/view-transform.hpp"
+
 #include <algorithm>
 #include <cfloat>
 #include <iostream>
@@ -22,7 +25,7 @@ bool view_action_interface_t::execute(const std::string &name, const std::vector
     {
         if ((args.size() < 2) || (wf::is_string(args.at(0)) == false))
         {
-            std::cerr << "View action interface: Set execution requires at least 2 arguments, the first of which should be an identifier." << std::endl;
+            LOGE("View action interface: Set execution requires at least 2 arguments, the first of which should be an identifier.");
             return true;
         }
 
@@ -44,7 +47,7 @@ bool view_action_interface_t::execute(const std::string &name, const std::vector
         }
         else
         {
-            std::cerr << "View action interface: Unsupported set operation to identifier " << id << std::endl;
+            LOGE("View action interface: Unsupported set operation to identifier ", id);
             return true;
         }
 
@@ -74,14 +77,14 @@ bool view_action_interface_t::execute(const std::string &name, const std::vector
     {
         if ((args.size() < 1) || (wf::is_string(args.at(0)) == false))
         {
-            std::cerr << "View action interface: Snap execution requires 1 string as argument." << std::endl;
+            LOGE("View action interface: Snap execution requires 1 string as argument.");
             return true;
         }
 
         auto output = _view->get_output();
         if (output == nullptr)
         {
-            std::cerr << "View action interface: Output associated with view was null." << std::endl;
+            LOGE("View action interface: Output associated with view was null.");
             return true;
         }
 
@@ -111,11 +114,11 @@ bool view_action_interface_t::execute(const std::string &name, const std::vector
         }
         else
         {
-            std::cerr << "View action interface: Incorrect string literal for snap location: " << location << "." << std::endl;
+            LOGE("View action interface: Incorrect string literal for snap location: ", location, ".");
             return true;
         }
 
-        std::cout << "View action interface: Snap to " << location << "." << std::endl;
+        LOGI("View action interface: Snap to ", location, ".");
 
         output->emit_signal("view-snap", &data);
 
@@ -136,7 +139,7 @@ bool view_action_interface_t::execute(const std::string &name, const std::vector
         }
     }
 
-    std::cerr << "View action interface: Unsupported action execution requested. Name: " << name << "." << std::endl;
+    LOGE("View action interface: Unsupported action execution requested. Name: ", name, ".");
     return true;
 }
 
@@ -203,7 +206,7 @@ std::tuple<bool, float> view_action_interface_t::_validate_alpha(const std::vect
         }
     }
 
-    std::cerr << "View action interface: Invalid arguments. Expected 'set alpha [float|double]." << std::endl;
+    LOGE("View action interface: Invalid arguments. Expected 'set alpha [float|double].");
     return {false, 1.0f};
 }
 
@@ -218,7 +221,7 @@ std::tuple<bool, int, int, int, int> view_action_interface_t::_validate_geometry
         return {true, std::get<1>(arg_x), std::get<1>(arg_y), std::get<1>(arg_w), std::get<1>(arg_h)};
     }
 
-    std::cerr << "View action interface: Invalid arguments. Expected 'set geometry int int int int." << std::endl;
+    LOGE("View action interface: Invalid arguments. Expected 'set geometry int int int int.");
     return {false, 0, 0, 0, 0};
 }
 
@@ -231,7 +234,7 @@ std::tuple<bool, int, int> view_action_interface_t::_validate_position(const std
         return {true, std::get<1>(arg_x), std::get<1>(arg_y)};
     }
 
-    std::cerr << "View action interface: Invalid arguments. Expected 'move int int." << std::endl;
+    LOGE("View action interface: Invalid arguments. Expected 'move int int.");
     return {false, 0, 0};
 }
 
@@ -244,7 +247,7 @@ std::tuple<bool, int, int> view_action_interface_t::_validate_size(const std::ve
         return {true, std::get<1>(arg_w), std::get<1>(arg_h)};
     }
 
-    std::cerr << "View action interface: Invalid arguments. Expected 'resize int int." << std::endl;
+    LOGE("View action interface: Invalid arguments. Expected 'resize int int.");
     return {false, 0, 0};
 }
 
@@ -265,7 +268,7 @@ void view_action_interface_t::_set_alpha(float alpha)
         transformer->alpha = alpha;
         _view->damage();
 
-        std::cout << "View action interface: Alpha set to " << alpha << "." << std::endl;
+        LOGI("View action interface: Alpha set to ", alpha, ".");
     }
 }
 

@@ -6,9 +6,14 @@
 #include <string>
 #include <tuple>
 
+#include "wayfire/core.hpp"
 #include "wayfire/object.hpp"
 #include "wayfire/nonstd/observer_ptr.h"
+#include "wayfire/parser/lambda_rule_parser.hpp"
 #include "wayfire/rule/lambda_rule.hpp"
+#include "wayfire/util/log.hpp"
+
+class wayfire_window_rules_t;
 
 namespace wf
 {
@@ -24,9 +29,15 @@ using map_type = std::map<std::string, std::shared_ptr<lambda_rule_registration_
  * register it on the lambda_rules_registrations_t singleton instance.
  *
  * At minimum, the rule string and if_lambda need to be set.
+ *
+ * The rule text defines the condition that will will be matched by window-rules. If the condition described
+ * in the rule text evaluates to true (using access_interface to determine the current values of variables),
+ * the if_lambda function will be executed. If the condition evaluates to false, the else_lambda (if not
+ * nullptr) will be executed.
  */
 struct lambda_rule_registration_t
 {
+  public:
     /**
      * @brief rule This is the rule text.
      *
@@ -59,6 +70,7 @@ struct lambda_rule_registration_t
      */
     std::shared_ptr<wf::access_interface_t> access_interface;
 
+  private:
     /**
      * @brief rule_instance Pointer to the parsed rule object.
      *
@@ -66,6 +78,12 @@ struct lambda_rule_registration_t
      *            variable. Window rules can then use this cached rule instance on each signal occurrence.
      */
     std::shared_ptr<wf::lambda_rule_t> rule_instance;
+
+    // Friendship for window rules to be able to execute the rules.
+    friend class ::wayfire_window_rules_t;
+
+    // Friendship for the rules registrations to be able to modify the rule set.
+    friend class lambda_rules_registrations_t;
 };
 
 /**
@@ -85,7 +103,24 @@ class lambda_rules_registrations_t : public custom_data_t
      *
      * @return Observer pointer to the singleton instance, fetched from wf::core.
      */
-    static nonstd::observer_ptr<lambda_rules_registrations_t> getInstance();
+    static nonstd::observer_ptr<lambda_rules_registrations_t> get_instance()
+    {
+        auto instance = get_core().get_data<lambda_rules_registrations_t>();
+        if (instance == nullptr)
+        {
+            get_core().store_data(std::unique_ptr<lambda_rules_registrations_t>(new lambda_rules_registrations_t()));
+
+            instance = get_core().get_data<lambda_rules_registrations_t>();
+
+            if (instance == nullptr) {
+                LOGE("Window lambda rules: Lazy-init of lambda registrations failed.");
+            } else {
+                LOGI("Window lambda rules: Lazy-init of lambda registrations succeeded.");
+            }
+        }
+
+        return instance;
+    }
 
     /**
      * @brief registerLambdaRule Registers a lambda rule with its associated key.
@@ -97,7 +132,25 @@ class lambda_rules_registrations_t : public custom_data_t
      *
      * @return <code>True</code> in case of error, <code>false</code> if ok.
      */
-    bool registerLambdaRule(std::string key, std::shared_ptr<lambda_rule_registration_t> registration);
+    bool register_lambda_rule(std::string key, std::shared_ptr<lambda_rule_registration_t> registration)
+    {
+        if (_registrations.find(key) != _registrations.end()) {
+            return true; // Error, key already exists.
+        }
+
+        if (registration->if_lambda == nullptr) {
+            return true; // Error, no if lambda specified.
+        }
+
+        registration->rule_instance = lambda_rule_parser_t().parse(registration->rule, registration->if_lambda, registration->else_lambda);
+        if (registration->rule_instance == nullptr) {
+            return true; // Error, failed to parse rule.
+        }
+
+        _registrations.emplace(key, registration);
+
+        return false;
+    }
 
     /**
      * @brief unregisterLambdaRule Unregisters a lambda rule with its associated key.
@@ -106,19 +159,25 @@ class lambda_rules_registrations_t : public custom_data_t
      *
      * @param[in] key Unique key for the registration.
      */
-    void unregisterLambdaRule(std::string key);
+    void unregister_lambda_rule(std::string key)
+    {
+        _registrations.erase(key);
+    }
 
     /**
      * @brief rules Gets the boundaries of the rules map as a tuple of cbegin() and cend() const_iterators.
      *
      * @return Boundaries of the rules map.
      */
-    std::tuple<map_type::const_iterator, map_type::const_iterator> rules();
+    std::tuple<map_type::const_iterator, map_type::const_iterator> rules()
+    {
+        return std::tuple(_registrations.cbegin(), _registrations.cend());
+    }
   private:
     /**
      * @brief lambda_rules_registrations_t Constructor, private to enforce singleton design pattern.
      */
-    lambda_rules_registrations_t();
+    lambda_rules_registrations_t() = default;
 
     /**
      * @brief _registrations The map holding all the current registrations.
