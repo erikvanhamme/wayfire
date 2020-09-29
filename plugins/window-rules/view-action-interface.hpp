@@ -44,6 +44,8 @@ class view_action_interface_t : public action_interface_t
     void _move(int x, int y);
     void _resize(int w, int h);
 
+    wf::geometry_t _get_workspace_grid_geometry(wf::output_t *output) const;
+
     wayfire_view _view;
 };
 } // End namespace wf.

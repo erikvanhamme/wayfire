@@ -2,6 +2,7 @@
 
 #include "wayfire/output.hpp"
 #include "wayfire/view.hpp"
+#include "wayfire/workspace-manager.hpp"
 #include "../single_plugins/snap_signal.hpp" // TODO: Should snap_signal be in
                                              // wayfire/plugins/common ?
 #include "wayfire/util/log.hpp"
@@ -324,18 +325,34 @@ void view_action_interface_t::_set_geometry(int x, int y, int w, int h)
     _move(x, y);
 }
 
+wf::geometry_t view_action_interface_t::_get_workspace_grid_geometry(
+    wf::output_t *output) const
+{
+    auto vsize = output->workspace->get_workspace_grid_size();
+    auto vp    = output->workspace->get_current_workspace();
+    auto res   = output->get_screen_size();
+
+    return wf::geometry_t{
+        -vp.x * res.width,
+        -vp.y * res.height,
+        vsize.width * res.width,
+        vsize.height * res.height,
+    };
+}
+
 void view_action_interface_t::_move(int x, int y)
 {
-    // Clamp x and y to sane values. Do not allow to move outside of the output.
+    // Clamp x and y to sane values. Do not allow to move outside of workspace grid.
     auto output = _view->get_output();
     if (output != nullptr)
     {
-        auto dimensions = output->get_screen_size();
+        auto grid = this->_get_workspace_grid_geometry(output);
+        auto view_geometry = _view->get_wm_geometry();
+        view_geometry.x = x;
+        view_geometry.y = y;
 
-        x = std::clamp(x, 0, (dimensions.width - 40));
-        y = std::clamp(y, 0, (dimensions.height - 30));
-
-        _view->move(x, y);
+        view_geometry = wf::clamp(view_geometry, grid);
+        _view->move(view_geometry.x, view_geometry.y);
     }
 }
 
