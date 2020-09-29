@@ -23,20 +23,20 @@ using map_type = std::map<std::string, std::shared_ptr<lambda_rule_registration_
 
 /**
  * @brief The lambda_rule_registration_t struct represents registration information
- *for a single lambda rule.
+ * for a single lambda rule.
  *
  * To make a registration, create one of these structures in a shared_ptr, fill in
- *the appropriate values and
+ * the appropriate values and
  * register it on the lambda_rules_registrations_t singleton instance.
  *
  * At minimum, the rule string and if_lambda need to be set.
  *
  * The rule text defines the condition that will will be matched by window-rules. If
- *the condition described
+ * the condition described
  * in the rule text evaluates to true (using access_interface to determine the
- *current values of variables),
+ * current values of variables),
  * the if_lambda function will be executed. If the condition evaluates to false, the
- *else_lambda (if not
+ * else_lambda (if not
  * nullptr) will be executed.
  */
 struct lambda_rule_registration_t
@@ -51,7 +51,7 @@ struct lambda_rule_registration_t
 
     /**
      * @brief if_lambda This is the lambda method to be executed if the specified
-     *condition holds.
+     * condition holds.
      *
      * @note The registering plugin is supposed to set this value before registering.
      */
@@ -59,13 +59,13 @@ struct lambda_rule_registration_t
 
     /**
      * @brief else_lambda This is the lambda method to be executed if the specified
-     *condition does not hold.
+     * condition does not hold.
      *
      * @note The registering plugin is supposed to set this value before registering.
      * @note In most cases this should be left blank.
      *
      * @attention: Be very careful with this lambda because it will be executed on
-     *the signal for each view
+     * the signal for each view
      *             that did NOT match the condition.
      */
     wf::lambda_t else_lambda;
@@ -74,7 +74,7 @@ struct lambda_rule_registration_t
      * @brief access_interface Access interface to be used when evaluating the rule.
      *
      * @note If this is left blank (nullptr), the standard view_access_interface_t
-     *instance will be used.
+     * instance will be used.
      */
     std::shared_ptr<wf::access_interface_t> access_interface;
 
@@ -83,9 +83,9 @@ struct lambda_rule_registration_t
      * @brief rule_instance Pointer to the parsed rule object.
      *
      * @attention You should not set this. Leave it at nullptr, the registration
-     *process will fill in this
+     * process will fill in this
      *            variable. Window rules can then use this cached rule instance on
-     *each signal occurrence.
+     * each signal occurrence.
      */
     std::shared_ptr<wf::lambda_rule_t> rule_instance;
 
@@ -98,13 +98,13 @@ struct lambda_rule_registration_t
 
 /**
  * @brief The lambda_rules_registrations_t class is a helper class for easy
- *registration and unregistration of
+ * registration and unregistration of
  *        lambda rules for the window rules plugin.
  *
  * This class is a singleton and can only be used via the getInstance() method.
  *
  * The instance is stored in wf::core. The getInstance() method will fetch from
- *wf:core, and lazy-init if the
+ * wf:core, and lazy-init if the
  * instance is not yet present.
  */
 class lambda_rules_registrations_t : public custom_data_t
@@ -142,7 +142,7 @@ class lambda_rules_registrations_t : public custom_data_t
      * @brief registerLambdaRule Registers a lambda rule with its associated key.
      *
      * This method will return error result if the key is not unique or the
-     *registration struct is incomplete.
+     * registration struct is incomplete.
      *
      * @param[in] key Unique key for the registration.
      * @param[in] registration The registration structure.
@@ -189,7 +189,7 @@ class lambda_rules_registrations_t : public custom_data_t
 
     /**
      * @brief rules Gets the boundaries of the rules map as a tuple of cbegin() and
-     *cend() const_iterators.
+     * cend() const_iterators.
      *
      * @return Boundaries of the rules map.
      */
@@ -201,7 +201,7 @@ class lambda_rules_registrations_t : public custom_data_t
   private:
     /**
      * @brief lambda_rules_registrations_t Constructor, private to enforce singleton
-     *design pattern.
+     * design pattern.
      */
     lambda_rules_registrations_t() = default;
 
