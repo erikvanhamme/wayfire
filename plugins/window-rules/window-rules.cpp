@@ -30,6 +30,7 @@ class wayfire_window_rules_t : public wf::plugin_interface_t
 
     wf::signal_callback_t _created;
     wf::signal_callback_t _maximized;
+    wf::signal_callback_t _unmaximized;
     wf::signal_callback_t _minimized;
     wf::signal_callback_t _fullscreened;
 
@@ -94,6 +95,13 @@ void wayfire_window_rules_t::init()
     };
     output->connect_signal("view-tiled", &_maximized);
 
+    // Unaximized rule handler.
+    _unmaximized = [=] (wf::signal_data_t *data)
+    {
+        apply("unmaximized", data);
+    };
+    output->connect_signal("view-tiled", &_unmaximized);
+
     // Minimized rule handler.
     _minimized = [=] (wf::signal_data_t *data)
     {
@@ -113,6 +121,7 @@ void wayfire_window_rules_t::fini()
 {
     output->disconnect_signal("view-mapped", &_created);
     output->disconnect_signal("view-tiled", &_maximized);
+    output->disconnect_signal("view-tiled", &_unmaximized);
     output->disconnect_signal("view-minimized", &_minimized);
     output->disconnect_signal("view-fullscreen", &_fullscreened);
 }
@@ -134,6 +143,11 @@ void wayfire_window_rules_t::apply(const std::string & signal,
     }
 
     if ((signal == "maximized") && (view->tiled_edges != wf::TILED_EDGES_ALL))
+    {
+        return;
+    }
+
+    if ((signal == "unmaximized") && (view->tiled_edges == wf::TILED_EDGES_ALL))
     {
         return;
     }
