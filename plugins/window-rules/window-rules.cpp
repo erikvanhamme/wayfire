@@ -51,15 +51,16 @@ void wayfire_window_rules_t::init()
     // Test rule
     auto reg = std::make_shared<wf::lambda_rule_registration_t>();
     reg->rule = "on created if title contains \"Alacritty\"";
-    reg->if_lambda = [] ()
+    reg->if_lambda = [] (std::string signal, wayfire_view view)
     {
-        LOGI("test rule IF_LAMBDA!");
+        LOGW("test rule IF_LAMBDA! signal=", signal, ", view=", view->get_app_id());
 
         return false;
     };
-    reg->else_lambda = [] ()
+    reg->else_lambda = [] (std::string signal, wayfire_view view)
     {
-        LOGI("test rule ELSE_LAMBDA!");
+        LOGW("test rule ELSE_LAMBDA! signal=", signal, ", view=",
+            view->get_app_id());
 
         return false;
     };
@@ -171,19 +172,55 @@ void wayfire_window_rules_t::apply(const std::string & signal,
         auto registration = std::get<1>(*begin);
         bool error = false;
 
-        if (registration->access_interface == nullptr)
-        {
-            _access_interface.set_view(view);
+        // Assume we will use the view access interface.
+        _access_interface.set_view(view);
+        wf::access_interface_t & access_iface = _access_interface;
 
-            // TODO: Remove debug/test code.
-            LOGI("Apply rule to view: ", view->get_app_id(), ": ");
-
-            error = registration->rule_instance->apply(signal, _access_interface);
-        } else
+        // If a custom access interface is set in the regoistration, use this one.
+        if (registration->access_interface != nullptr)
         {
-            error = registration->rule_instance->apply(signal,
-                *registration->access_interface);
+            access_iface = *registration->access_interface;
         }
+
+        // TODO: Remove debug/test code.
+        LOGW("Apply rule to view: ", view->get_app_id(), ": ");
+
+        // Load if lambda wrapper.
+        if (registration->if_lambda != nullptr)
+        {
+            registration->rule_instance->setIfLambda(
+                [registration, signal, view] () -> bool
+            {
+                if (registration->if_lambda != nullptr)
+                {
+                    return registration->if_lambda(signal, view);
+                }
+
+                return false;
+            });
+        }
+
+        // Load else lambda wrapper.
+        if (registration->else_lambda)
+        {
+            registration->rule_instance->setElseLambda(
+                [registration, signal, view] () -> bool
+            {
+                if (registration->else_lambda != nullptr)
+                {
+                    return registration->else_lambda(signal, view);
+                }
+
+                return false;
+            });
+        }
+
+        // Run the lambda rule.
+        error = registration->rule_instance->apply(signal, _access_interface);
+
+        // Unload wrappers.
+        registration->rule_instance->setIfLambda(nullptr);
+        registration->rule_instance->setElseLambda(nullptr);
 
         if (error)
         {

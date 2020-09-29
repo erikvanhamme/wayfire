@@ -12,6 +12,7 @@
 #include "wayfire/parser/lambda_rule_parser.hpp"
 #include "wayfire/rule/lambda_rule.hpp"
 #include "wayfire/util/log.hpp"
+#include "wayfire/view.hpp"
 
 class wayfire_window_rules_t;
 
@@ -20,6 +21,8 @@ namespace wf
 struct lambda_rule_registration_t;
 
 using map_type = std::map<std::string, std::shared_ptr<lambda_rule_registration_t>>;
+
+using lambda_reg_t = std::function<bool (std::string, wayfire_view)>;
 
 /**
  * @brief The lambda_rule_registration_t struct represents registration information
@@ -55,7 +58,7 @@ struct lambda_rule_registration_t
      *
      * @note The registering plugin is supposed to set this value before registering.
      */
-    wf::lambda_t if_lambda;
+    wf::lambda_reg_t if_lambda;
 
     /**
      * @brief else_lambda This is the lambda method to be executed if the specified
@@ -68,7 +71,7 @@ struct lambda_rule_registration_t
      * the signal for each view
      *             that did NOT match the condition.
      */
-    wf::lambda_t else_lambda;
+    wf::lambda_reg_t else_lambda;
 
     /**
      * @brief access_interface Access interface to be used when evaluating the rule.
@@ -163,8 +166,7 @@ class lambda_rules_registrations_t : public custom_data_t
         }
 
         registration->rule_instance = lambda_rule_parser_t().parse(
-            registration->rule, registration->if_lambda,
-            registration->else_lambda);
+            registration->rule, nullptr, nullptr);
         if (registration->rule_instance == nullptr)
         {
             return true; // Error, failed to parse rule.
