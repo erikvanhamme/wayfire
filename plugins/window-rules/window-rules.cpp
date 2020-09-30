@@ -47,29 +47,6 @@ void wayfire_window_rules_t::init()
     // Get the lambda rules registrations.
     _lambda_registrations = wf::lambda_rules_registrations_t::get_instance();
 
-    // TODO: Remove debug/test code.
-    // Test rule
-    auto reg = std::make_shared<wf::lambda_rule_registration_t>();
-    reg->rule = "on created if title contains \"Alacritty\"";
-    reg->if_lambda = [] (std::string signal, wayfire_view view)
-    {
-        LOGW("test rule IF_LAMBDA! signal=", signal, ", view=", view->get_app_id());
-
-        return false;
-    };
-    reg->else_lambda = [] (std::string signal, wayfire_view view)
-    {
-        LOGW("test rule ELSE_LAMBDA! signal=", signal, ", view=",
-            view->get_app_id());
-
-        return false;
-    };
-    auto error = _lambda_registrations->register_lambda_rule("test_rule", reg);
-    if (error)
-    {
-        LOGE("Window-rules: Error while registering test rule.");
-    }
-
     // Build rule list.
     auto section = wf::get_core().config.get_section("window-rules");
     for (auto opt : section->get_registered_options())
@@ -182,21 +159,13 @@ void wayfire_window_rules_t::apply(const std::string & signal,
             access_iface = *registration->access_interface;
         }
 
-        // TODO: Remove debug/test code.
-        LOGW("Apply rule to view: ", view->get_app_id(), ": ");
-
         // Load if lambda wrapper.
         if (registration->if_lambda != nullptr)
         {
             registration->rule_instance->setIfLambda(
                 [registration, signal, view] () -> bool
             {
-                if (registration->if_lambda != nullptr)
-                {
-                    return registration->if_lambda(signal, view);
-                }
-
-                return false;
+                return registration->if_lambda(signal, view);
             });
         }
 
@@ -206,12 +175,7 @@ void wayfire_window_rules_t::apply(const std::string & signal,
             registration->rule_instance->setElseLambda(
                 [registration, signal, view] () -> bool
             {
-                if (registration->else_lambda != nullptr)
-                {
-                    return registration->else_lambda(signal, view);
-                }
-
-                return false;
+                return registration->else_lambda(signal, view);
             });
         }
 
@@ -224,7 +188,8 @@ void wayfire_window_rules_t::apply(const std::string & signal,
 
         if (error)
         {
-            LOGE("Window-rules: Error while executing rule on ", signal, " signal.");
+            LOGE("Window-rules: Error while executing rule on signal: ", signal,
+                ", rule text:", registration->rule);
         }
 
         ++begin;

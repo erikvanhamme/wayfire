@@ -133,7 +133,7 @@ class lambda_rules_registrations_t : public custom_data_t
                 LOGE("Window lambda rules: Lazy-init of lambda registrations failed.");
             } else
             {
-                LOGI(
+                LOGD(
                     "Window lambda rules: Lazy-init of lambda registrations succeeded.");
             }
         }
